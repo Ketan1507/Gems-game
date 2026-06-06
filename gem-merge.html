@@ -1,0 +1,808 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Gem Merge</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  :root {
+    --bg: #0a0a12;
+    --surface: #13131f;
+    --surface2: #1c1c2e;
+    --border: rgba(255,255,255,0.07);
+    --text: #f0eeff;
+    --muted: #7a7a9a;
+    --accent: #a78bfa;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    overflow: hidden;
+    touch-action: none;
+  }
+
+  /* Subtle star field background */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      radial-gradient(1px 1px at 20% 30%, rgba(255,255,255,0.15) 0%, transparent 100%),
+      radial-gradient(1px 1px at 80% 10%, rgba(255,255,255,0.12) 0%, transparent 100%),
+      radial-gradient(1px 1px at 50% 80%, rgba(255,255,255,0.1) 0%, transparent 100%),
+      radial-gradient(1px 1px at 10% 70%, rgba(255,255,255,0.08) 0%, transparent 100%),
+      radial-gradient(1px 1px at 90% 60%, rgba(255,255,255,0.1) 0%, transparent 100%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  #app {
+    width: 100%;
+    max-width: 420px;
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    position: relative;
+    z-index: 1;
+    padding: 0 12px;
+  }
+
+  /* Header */
+  #header {
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 4px 10px;
+  }
+
+  #logo {
+    font-family: 'Syne', sans-serif;
+    font-size: 22px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+    background: linear-gradient(135deg, #a78bfa, #f472b6, #fb923c);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .score-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 6px 14px;
+    text-align: center;
+  }
+
+  .score-label {
+    font-size: 9px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--muted);
+    display: block;
+    margin-bottom: 1px;
+  }
+
+  .score-value {
+    font-family: 'Syne', sans-serif;
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text);
+    line-height: 1;
+  }
+
+  /* Next gem preview */
+  #next-area {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 4px;
+  }
+
+  #next-label {
+    font-size: 11px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  #next-gem-preview {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    box-shadow: 0 0 12px currentColor;
+  }
+
+  /* Drop indicator */
+  #drop-area {
+    width: 100%;
+    position: relative;
+    height: 40px;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+
+  #drop-gem {
+    position: absolute;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+    transform: translateX(-50%);
+    top: -4px;
+    transition: left 0.05s;
+    pointer-events: none;
+  }
+
+  #drop-line {
+    position: absolute;
+    width: 1px;
+    background: rgba(255,255,255,0.15);
+    top: 40px;
+    bottom: 0;
+    pointer-events: none;
+    transform: translateX(-50%);
+  }
+
+  /* Game board */
+  #board-wrapper {
+    width: 100%;
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+  }
+
+  #board {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    overflow: hidden;
+  }
+
+  /* Danger line */
+  #danger-line {
+    position: absolute;
+    left: 0; right: 0;
+    top: 80px;
+    height: 1px;
+    background: rgba(248, 113, 113, 0.3);
+    z-index: 5;
+  }
+
+  #danger-line::before {
+    content: 'DANGER';
+    position: absolute;
+    right: 8px;
+    top: -9px;
+    font-size: 9px;
+    letter-spacing: 1px;
+    color: rgba(248, 113, 113, 0.5);
+  }
+
+  /* Gem particle */
+  .gem {
+    position: absolute;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1em;
+    user-select: none;
+    cursor: default;
+    transform: translate(-50%, -50%);
+    transition: box-shadow 0.2s;
+    will-change: transform;
+  }
+
+  .gem-merge-flash {
+    animation: mergeFlash 0.3s ease-out;
+  }
+
+  @keyframes mergeFlash {
+    0% { transform: translate(-50%, -50%) scale(1.5); opacity: 0.5; }
+    100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+  }
+
+  /* Overlay screens */
+  .overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(10,10,18,0.92);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    backdrop-filter: blur(8px);
+    gap: 20px;
+    padding: 32px;
+  }
+
+  .overlay h1 {
+    font-family: 'Syne', sans-serif;
+    font-size: 42px;
+    font-weight: 800;
+    text-align: center;
+    background: linear-gradient(135deg, #a78bfa, #f472b6, #fb923c);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    line-height: 1.1;
+  }
+
+  .overlay p {
+    color: var(--muted);
+    text-align: center;
+    font-size: 15px;
+    line-height: 1.6;
+    max-width: 280px;
+  }
+
+  .overlay .big-score {
+    font-family: 'Syne', sans-serif;
+    font-size: 56px;
+    font-weight: 800;
+    color: var(--text);
+    line-height: 1;
+  }
+
+  .btn {
+    background: linear-gradient(135deg, #7c3aed, #db2777);
+    color: white;
+    border: none;
+    border-radius: 14px;
+    padding: 16px 40px;
+    font-family: 'Syne', sans-serif;
+    font-size: 16px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    cursor: pointer;
+    width: 100%;
+    max-width: 260px;
+    transition: opacity 0.15s, transform 0.15s;
+  }
+
+  .btn:active { opacity: 0.85; transform: scale(0.97); }
+
+  .gem-guide {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    justify-content: center;
+    max-width: 300px;
+  }
+
+  .gem-guide-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    font-size: 10px;
+    color: var(--muted);
+  }
+
+  .hidden { display: none !important; }
+
+  /* Score pop animation */
+  .score-pop {
+    position: absolute;
+    font-family: 'Syne', sans-serif;
+    font-size: 20px;
+    font-weight: 700;
+    color: #a78bfa;
+    pointer-events: none;
+    z-index: 50;
+    animation: scorePop 0.8s ease-out forwards;
+    transform: translateX(-50%);
+  }
+
+  @keyframes scorePop {
+    0% { opacity: 1; transform: translateX(-50%) translateY(0); }
+    100% { opacity: 0; transform: translateX(-50%) translateY(-60px); }
+  }
+
+  #ad-banner {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 8px 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin: 6px 0 8px;
+    flex-shrink: 0;
+    min-height: 52px;
+  }
+
+  #ad-banner span {
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 0.5px;
+  }
+
+  #ad-banner .ad-placeholder {
+    font-size: 11px;
+    color: var(--muted);
+    border: 1px dashed rgba(255,255,255,0.1);
+    border-radius: 6px;
+    padding: 4px 12px;
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="header">
+    <div id="logo">💎 GemMerge</div>
+    <div style="display:flex;gap:8px;">
+      <div class="score-box">
+        <span class="score-label">Score</span>
+        <span class="score-value" id="score-display">0</span>
+      </div>
+      <div class="score-box">
+        <span class="score-label">Best</span>
+        <span class="score-value" id="best-display">0</span>
+      </div>
+    </div>
+  </div>
+
+  <div id="next-area">
+    <span id="next-label">Next</span>
+    <div id="next-gem-preview"></div>
+  </div>
+
+  <div id="drop-area">
+    <div id="drop-gem"></div>
+    <div id="drop-line"></div>
+  </div>
+
+  <div id="board-wrapper">
+    <div id="board">
+      <div id="danger-line"></div>
+    </div>
+  </div>
+
+  <!-- Ad banner placeholder - replace with real AdSense code -->
+  <div id="ad-banner">
+    <span>AD</span>
+    <div class="ad-placeholder">Your Google AdSense ad goes here</div>
+  </div>
+</div>
+
+<!-- Start Screen -->
+<div class="overlay" id="start-screen">
+  <h1>Gem<br>Merge</h1>
+  <p>Drop gems to merge identical ones into rarer gems. How high can you score?</p>
+  <div class="gem-guide" id="gem-guide-display"></div>
+  <button class="btn" onclick="startGame()">Play Now</button>
+</div>
+
+<!-- Game Over Screen -->
+<div class="overlay hidden" id="gameover-screen">
+  <h1>Game<br>Over</h1>
+  <div class="big-score" id="final-score">0</div>
+  <p id="gameover-msg">The gems reached the top!</p>
+  <button class="btn" onclick="startGame()">Play Again</button>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
+<script>
+// ─── GEM DEFINITIONS ───────────────────────────────────────────────
+const GEMS = [
+  { level: 1, emoji: '🔴', color: '#ef4444', glow: '#ef4444', label: 'Ruby',      radius: 18, score: 1   },
+  { level: 2, emoji: '🟠', color: '#f97316', glow: '#f97316', label: 'Amber',     radius: 24, score: 3   },
+  { level: 3, emoji: '🟡', color: '#eab308', glow: '#eab308', label: 'Topaz',     radius: 30, score: 6   },
+  { level: 4, emoji: '🟢', color: '#22c55e', glow: '#22c55e', label: 'Emerald',   radius: 38, score: 12  },
+  { level: 5, emoji: '🔵', color: '#3b82f6', glow: '#3b82f6', label: 'Sapphire',  radius: 46, score: 25  },
+  { level: 6, emoji: '🟣', color: '#a855f7', glow: '#a855f7', label: 'Amethyst',  radius: 55, score: 50  },
+  { level: 7, emoji: '⚪', color: '#e2e8f0', glow: '#e2e8f0', label: 'Diamond',   radius: 65, score: 100 },
+  { level: 8, emoji: '🌟', color: '#fbbf24', glow: '#fbbf24', label: 'Star',      radius: 76, score: 200 },
+  { level: 9, emoji: '💎', color: '#67e8f9', glow: '#67e8f9', label: 'Cosmic',    radius: 88, score: 400 },
+  { level:10, emoji: '🌈', color: '#f472b6', glow: '#f472b6', label: 'Rainbow',   radius:100, score: 800 },
+];
+
+const MAX_DROP_LEVEL = 5; // only drop levels 1-5
+
+// ─── STATE ─────────────────────────────────────────────────────────
+let engine, render, runner;
+let score = 0;
+let bestScore = parseInt(localStorage.getItem('gemMergeBest') || '0');
+let currentGemLevel = 1;
+let nextGemLevel = 1;
+let dropX = 0;
+let canDrop = true;
+let gemBodyMap = new Map(); // body.id → level
+let gameRunning = false;
+let mergeQueue = [];
+let processingMerge = false;
+let dropCooldown = false;
+
+const board = document.getElementById('board');
+const dropGemEl = document.getElementById('drop-gem');
+const dropLineEl = document.getElementById('drop-line');
+const dropArea = document.getElementById('drop-area');
+const scoreDisplay = document.getElementById('score-display');
+const bestDisplay = document.getElementById('best-display');
+const nextPreview = document.getElementById('next-gem-preview');
+
+// ─── UTILS ─────────────────────────────────────────────────────────
+function randomDropLevel() {
+  // weighted: lower levels more common
+  const weights = [40, 30, 20, 7, 3];
+  const total = weights.reduce((a, b) => a + b, 0);
+  let r = Math.random() * total;
+  for (let i = 0; i < weights.length; i++) {
+    r -= weights[i];
+    if (r <= 0) return i + 1;
+  }
+  return 1;
+}
+
+function gemStyle(level) {
+  const g = GEMS[level - 1];
+  return `background:${g.color};box-shadow:0 0 14px ${g.glow}55, 0 0 28px ${g.glow}22;`;
+}
+
+function updateScoreDisplay() {
+  scoreDisplay.textContent = score;
+  bestDisplay.textContent = bestScore;
+}
+
+function updateNextPreview() {
+  const g = GEMS[nextGemLevel - 1];
+  nextPreview.style.cssText = `width:${Math.min(g.radius, 22)*2}px;height:${Math.min(g.radius,22)*2}px;background:${g.color};box-shadow:0 0 12px ${g.glow}88;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:${Math.min(g.radius,22)-4}px;`;
+  nextPreview.textContent = g.emoji;
+}
+
+function updateDropGem() {
+  const g = GEMS[currentGemLevel - 1];
+  const sz = Math.min(g.radius, 22) * 2 + 8;
+  dropGemEl.style.cssText = `width:${sz}px;height:${sz}px;${gemStyle(currentGemLevel)}border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:${Math.min(g.radius,22)}px;position:absolute;transform:translateX(-50%);top:-4px;pointer-events:none;`;
+  dropGemEl.textContent = g.emoji;
+}
+
+function showScorePop(x, y, points) {
+  const el = document.createElement('div');
+  el.className = 'score-pop';
+  el.textContent = `+${points}`;
+  el.style.left = x + 'px';
+  el.style.top = y + 'px';
+  board.appendChild(el);
+  setTimeout(() => el.remove(), 800);
+}
+
+// ─── PHYSICS SETUP ─────────────────────────────────────────────────
+function initPhysics() {
+  if (engine) {
+    Matter.Runner.stop(runner);
+    Matter.Render.stop(render);
+    Matter.World.clear(engine.world);
+    Matter.Engine.clear(engine);
+    if (render.canvas) render.canvas.remove();
+  }
+
+  const W = board.clientWidth;
+  const H = board.clientHeight;
+
+  engine = Matter.Engine.create({ gravity: { y: 1.8 } });
+
+  render = Matter.Render.create({
+    element: board,
+    engine: engine,
+    options: {
+      width: W,
+      height: H,
+      wireframes: false,
+      background: 'transparent',
+    }
+  });
+
+  // Walls
+  const wallOpts = { isStatic: true, friction: 0.3, render: { fillStyle: 'transparent', strokeStyle: 'rgba(255,255,255,0.05)', lineWidth: 1 } };
+  const floor  = Matter.Bodies.rectangle(W/2, H + 25, W + 10, 50, wallOpts);
+  const wallL  = Matter.Bodies.rectangle(-25, H/2, 50, H * 2, wallOpts);
+  const wallR  = Matter.Bodies.rectangle(W + 25, H/2, 50, H * 2, wallOpts);
+
+  Matter.World.add(engine.world, [floor, wallL, wallR]);
+
+  runner = Matter.Runner.create();
+  Matter.Runner.run(runner, engine);
+  Matter.Render.run(render);
+
+  // Render canvas styling
+  render.canvas.style.position = 'absolute';
+  render.canvas.style.top = '0';
+  render.canvas.style.left = '0';
+  render.canvas.style.borderRadius = '16px';
+
+  gemBodyMap.clear();
+
+  // Collision detection for merging
+  Matter.Events.on(engine, 'collisionStart', handleCollision);
+  // Game over check
+  Matter.Events.on(engine, 'afterUpdate', checkGameOver);
+}
+
+let gameOverChecking = false;
+let gameOverFrames = 0;
+
+function checkGameOver() {
+  if (!gameRunning) return;
+  // Check if any gem has been above danger line (y=80) for too long
+  const bodies = Matter.Composite.allBodies(engine.world).filter(b => !b.isStatic);
+  let danger = false;
+  for (const b of bodies) {
+    if (b.position.y - (b.circleRadius || 20) < 80 && b.speed < 0.5) {
+      danger = true;
+      break;
+    }
+  }
+  if (danger) {
+    gameOverFrames++;
+    if (gameOverFrames > 90) triggerGameOver();
+  } else {
+    gameOverFrames = 0;
+  }
+}
+
+function handleCollision(event) {
+  const pairs = event.pairs;
+  for (const pair of pairs) {
+    const { bodyA, bodyB } = pair;
+    const levelA = gemBodyMap.get(bodyA.id);
+    const levelB = gemBodyMap.get(bodyB.id);
+    if (levelA && levelB && levelA === levelB && levelA < GEMS.length) {
+      // Queue merge
+      mergeQueue.push({ bodyA, bodyB, level: levelA });
+    }
+  }
+  if (mergeQueue.length > 0 && !processingMerge) {
+    processMergeQueue();
+  }
+}
+
+function processMergeQueue() {
+  if (mergeQueue.length === 0) { processingMerge = false; return; }
+  processingMerge = true;
+  const { bodyA, bodyB, level } = mergeQueue.shift();
+
+  // Make sure they're still in world
+  if (!gemBodyMap.has(bodyA.id) || !gemBodyMap.has(bodyB.id)) {
+    processMergeQueue();
+    return;
+  }
+
+  const midX = (bodyA.position.x + bodyB.position.x) / 2;
+  const midY = (bodyA.position.y + bodyB.position.y) / 2;
+
+  // Remove both
+  Matter.World.remove(engine.world, bodyA);
+  Matter.World.remove(engine.world, bodyB);
+  gemBodyMap.delete(bodyA.id);
+  gemBodyMap.delete(bodyB.id);
+
+  const newLevel = level + 1;
+  const gemDef = GEMS[newLevel - 1];
+
+  // Add merged gem
+  setTimeout(() => {
+    addGemBody(midX, midY, newLevel, true);
+    // Score
+    score += gemDef.score;
+    if (score > bestScore) {
+      bestScore = score;
+      localStorage.setItem('gemMergeBest', bestScore);
+    }
+    updateScoreDisplay();
+    showScorePop(midX, midY - gemDef.radius, gemDef.score);
+    processMergeQueue();
+  }, 50);
+}
+
+function addGemBody(x, y, level, isMerged = false) {
+  const g = GEMS[level - 1];
+  const body = Matter.Bodies.circle(x, y, g.radius, {
+    restitution: 0.2,
+    friction: 0.5,
+    frictionAir: 0.01,
+    density: 0.002,
+    render: {
+      fillStyle: g.color,
+      strokeStyle: g.glow + '88',
+      lineWidth: 2,
+    }
+  });
+  Matter.World.add(engine.world, body);
+  gemBodyMap.set(body.id, level);
+
+  // Add emoji overlay element
+  const el = document.createElement('div');
+  el.className = 'gem' + (isMerged ? ' gem-merge-flash' : '');
+  el.style.cssText = `width:${g.radius*2}px;height:${g.radius*2}px;font-size:${g.radius}px;line-height:${g.radius*2}px;text-align:center;${gemStyle(level)}`;
+  el.textContent = g.emoji;
+  el.dataset.bodyId = body.id;
+  board.appendChild(el);
+
+  return body;
+}
+
+// Sync DOM gems with physics bodies
+function syncGemElements() {
+  const elements = board.querySelectorAll('.gem');
+  const bodies = Matter.Composite.allBodies(engine.world).filter(b => !b.isStatic);
+  const bodyMap = {};
+  bodies.forEach(b => bodyMap[b.id] = b);
+
+  elements.forEach(el => {
+    const id = parseInt(el.dataset.bodyId);
+    const body = bodyMap[id];
+    if (!body) {
+      el.remove();
+    } else {
+      el.style.left = body.position.x + 'px';
+      el.style.top = body.position.y + 'px';
+    }
+  });
+
+  if (gameRunning) requestAnimationFrame(syncGemElements);
+}
+
+// ─── DROP LOGIC ─────────────────────────────────────────────────────
+function dropGem() {
+  if (!canDrop || !gameRunning || dropCooldown) return;
+  dropCooldown = true;
+
+  const W = board.clientWidth;
+  const g = GEMS[currentGemLevel - 1];
+  const clampedX = Math.max(g.radius + 5, Math.min(W - g.radius - 5, dropX));
+
+  addGemBody(clampedX, 10, currentGemLevel);
+
+  currentGemLevel = nextGemLevel;
+  nextGemLevel = randomDropLevel();
+  updateDropGem();
+  updateNextPreview();
+  updateDropGem();
+
+  setTimeout(() => { dropCooldown = false; }, 400);
+}
+
+// ─── INPUT HANDLING ─────────────────────────────────────────────────
+function setupInput() {
+  const W = board.clientWidth;
+
+  function getX(e) {
+    const rect = board.getBoundingClientRect();
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    return clientX - rect.left;
+  }
+
+  function moveDropIndicator(x) {
+    const g = GEMS[currentGemLevel - 1];
+    const clamped = Math.max(g.radius + 5, Math.min(W - g.radius - 5, x));
+    dropX = clamped;
+    const pct = clamped / W * 100;
+    dropGemEl.style.left = pct + '%';
+    dropLineEl.style.left = pct + '%';
+    dropLineEl.style.height = board.clientHeight + 'px';
+  }
+
+  // Touch events on the entire app
+  let isDragging = false;
+  const app = document.getElementById('app');
+
+  app.addEventListener('touchstart', e => {
+    if (!gameRunning) return;
+    isDragging = true;
+    moveDropIndicator(getX(e));
+  }, { passive: true });
+
+  app.addEventListener('touchmove', e => {
+    if (!gameRunning || !isDragging) return;
+    e.preventDefault();
+    moveDropIndicator(getX(e));
+  }, { passive: false });
+
+  app.addEventListener('touchend', e => {
+    if (!gameRunning || !isDragging) return;
+    isDragging = false;
+    dropGem();
+  });
+
+  // Mouse events
+  app.addEventListener('mousemove', e => {
+    if (!gameRunning) return;
+    moveDropIndicator(getX(e));
+  });
+
+  app.addEventListener('click', e => {
+    if (!gameRunning) return;
+    moveDropIndicator(getX(e));
+    dropGem();
+  });
+
+  // Initial position
+  dropX = W / 2;
+  dropGemEl.style.left = '50%';
+  dropLineEl.style.left = '50%';
+  dropLineEl.style.height = board.clientHeight + 'px';
+}
+
+// ─── GAME FLOW ─────────────────────────────────────────────────────
+function startGame() {
+  document.getElementById('start-screen').classList.add('hidden');
+  document.getElementById('gameover-screen').classList.add('hidden');
+
+  score = 0;
+  gameOverFrames = 0;
+  canDrop = true;
+  dropCooldown = false;
+  processingMerge = false;
+  mergeQueue = [];
+  currentGemLevel = randomDropLevel();
+  nextGemLevel = randomDropLevel();
+
+  updateScoreDisplay();
+  updateDropGem();
+  updateNextPreview();
+  initPhysics();
+
+  gameRunning = true;
+  syncGemElements();
+}
+
+function triggerGameOver() {
+  if (!gameRunning) return;
+  gameRunning = false;
+  if (score > bestScore) {
+    bestScore = score;
+    localStorage.setItem('gemMergeBest', bestScore);
+  }
+  document.getElementById('final-score').textContent = score;
+  document.getElementById('gameover-screen').classList.remove('hidden');
+}
+
+// ─── GUIDE ON START SCREEN ─────────────────────────────────────────
+function buildGuide() {
+  const guide = document.getElementById('gem-guide-display');
+  GEMS.slice(0, 7).forEach(g => {
+    const item = document.createElement('div');
+    item.className = 'gem-guide-item';
+    item.innerHTML = `<span style="font-size:22px">${g.emoji}</span><span>${g.label}</span>`;
+    guide.appendChild(item);
+  });
+  const more = document.createElement('div');
+  more.className = 'gem-guide-item';
+  more.innerHTML = `<span style="font-size:22px">✨</span><span>+3 more</span>`;
+  guide.appendChild(more);
+}
+
+bestDisplay.textContent = bestScore;
+buildGuide();
+setupInput();
+</script>
+</body>
+</html>
